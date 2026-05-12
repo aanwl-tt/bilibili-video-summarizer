@@ -71,3 +71,12 @@ export interface ProviderInfo {
   needsBaseUrl: boolean;
   needsApiKey: boolean;
 }
+
+export interface HistoryEntry {
+  id: string;
+  timestamp: number;
+  bvid: string;
+  title: string;
+  author: string;
+  result: SummaryResult;
+}

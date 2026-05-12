@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback } from "react";
 import type { VideoMetadata } from "../shared/types/video";
-import type { SummaryResult } from "../shared/types/api";
+import type { SummaryResult, HistoryEntry } from "../shared/types/api";
 import type { ExtensionSettings } from "../shared/types/settings";
 import SummaryView from "./components/SummaryView";
 import SettingsPanel from "./components/SettingsPanel";
+import HistoryPanel from "./components/HistoryPanel";
 
-type View = "summary" | "settings" | "idle" | "loading" | "error";
+type View = "summary" | "settings" | "idle" | "loading" | "error" | "history";
+
+const MAX_HISTORY = 100;
 
 export default function App() {
   const [view, setView] = useState<View>("idle");
@@ -14,6 +17,7 @@ export default function App() {
   const [error, setError] = useState<string>("");
   const [settings, setSettings] = useState<ExtensionSettings | null>(null);
   const [toast, setToast] = useState<string>("");
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
 
   useEffect(() => {
     chrome.runtime.sendMessage({ type: "GET_SETTINGS" }, (s) => {
@@ -26,10 +30,23 @@ export default function App() {
       if (v) setVideo(v as VideoMetadata);
     });
 
+    // Restore saved summary
+    chrome.storage.local.get(["lastSummary", "history"], (data) => {
+      if (chrome.runtime.lastError) return;
+      if (data.lastSummary) {
+        setResult(data.lastSummary as SummaryResult);
+        setView("summary");
+      }
+      if (data.history) {
+        setHistory(data.history as HistoryEntry[]);
+      }
+    });
+
     const listener = (message: unknown) => {
       const msg = message as Record<string, unknown>;
       if (msg.type === "VIDEO_UPDATED") {
         setVideo(msg.payload as VideoMetadata);
+        setResult(null);
         setView("idle");
         setError("");
       }
@@ -47,6 +64,22 @@ export default function App() {
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(""), 2000);
+  }, []);
+
+  const saveToHistory = useCallback((videoMeta: VideoMetadata, summaryResult: SummaryResult) => {
+    const entry: HistoryEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      timestamp: Date.now(),
+      bvid: videoMeta.bvid,
+      title: videoMeta.title,
+      author: videoMeta.author,
+      result: summaryResult,
+    };
+    setHistory((prev) => {
+      const next = [entry, ...prev].slice(0, MAX_HISTORY);
+      chrome.storage.local.set({ history: next });
+      return next;
+    });
   }, []);
 
   const handleSummarize = useCallback(async () => {
@@ -78,10 +111,12 @@ export default function App() {
         } else if (response.data) {
           setResult(response.data);
           setView("summary");
+          chrome.storage.local.set({ lastSummary: response.data });
+          saveToHistory(video, response.data);
         }
       }
     );
-  }, [video]);
+  }, [video, saveToHistory]);
 
   const handleSeek = useCallback((timestamp: number) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -91,6 +126,14 @@ export default function App() {
           payload: { time: timestamp },
         }).catch(() => {});
       }
+    });
+  }, []);
+
+  const handleDeleteHistory = useCallback((ids: string[]) => {
+    setHistory((prev) => {
+      const next = prev.filter((h) => !ids.includes(h.id));
+      chrome.storage.local.set({ history: next });
+      return next;
     });
   }, []);
 
@@ -118,6 +161,20 @@ export default function App() {
           {video ? video.title : "Bilibili Summarizer"}
         </h1>
         <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={() => setView(view === "history" ? "idle" : "history")}
+            style={{
+              background: view === "history" ? "var(--primary-light)" : "var(--bg-secondary)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)",
+              padding: "6px 10px",
+              fontSize: 14,
+              color: view === "history" ? "var(--primary)" : "var(--text-secondary)",
+            }}
+            title="历史记录"
+          >
+            &#128214;
+          </button>
           <button
             onClick={() => setView(view === "settings" ? "idle" : "settings")}
             style={{
@@ -152,7 +209,7 @@ export default function App() {
       </div>
 
       {/* Video Info Card */}
-      {video && view !== "settings" && (
+      {video && view !== "settings" && view !== "history" && (
         <div style={{
           background: "var(--bg-secondary)",
           borderRadius: "var(--radius-md)",
@@ -184,6 +241,16 @@ export default function App() {
             </p>
           </div>
         </div>
+      )}
+
+      {/* History Panel */}
+      {view === "history" && (
+        <HistoryPanel
+          history={history}
+          onBack={() => setView("idle")}
+          onDelete={handleDeleteHistory}
+          showToast={showToast}
+        />
       )}
 
       {/* Settings Panel */}
