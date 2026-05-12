@@ -8,8 +8,6 @@ import HistoryPanel from "./components/HistoryPanel";
 
 type View = "summary" | "settings" | "idle" | "loading" | "error" | "history";
 
-const MAX_HISTORY = 100;
-
 export default function App() {
   const [view, setView] = useState<View>("idle");
   const [video, setVideo] = useState<VideoMetadata | null>(null);
@@ -66,22 +64,6 @@ export default function App() {
     setTimeout(() => setToast(""), 2000);
   }, []);
 
-  const saveToHistory = useCallback((videoMeta: VideoMetadata, summaryResult: SummaryResult) => {
-    const entry: HistoryEntry = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      timestamp: Date.now(),
-      bvid: videoMeta.bvid,
-      title: videoMeta.title,
-      author: videoMeta.author,
-      result: summaryResult,
-    };
-    setHistory((prev) => {
-      const next = [entry, ...prev].slice(0, MAX_HISTORY);
-      chrome.storage.local.set({ history: next });
-      return next;
-    });
-  }, []);
-
   const handleSummarize = useCallback(async () => {
     if (!video) {
       setError("请先打开一个 Bilibili 视频页面");
@@ -111,12 +93,14 @@ export default function App() {
         } else if (response.data) {
           setResult(response.data);
           setView("summary");
-          chrome.storage.local.set({ lastSummary: response.data });
-          saveToHistory(video, response.data);
+          // Background already saved to history, refresh local state
+          chrome.storage.local.get("history", (data) => {
+            if (data.history) setHistory(data.history as HistoryEntry[]);
+          });
         }
       }
     );
-  }, [video, saveToHistory]);
+  }, [video]);
 
   const handleSeek = useCallback((timestamp: number) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {

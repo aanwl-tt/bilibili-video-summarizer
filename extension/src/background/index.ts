@@ -1,6 +1,6 @@
 import type { VideoMetadata } from "../shared/types/video";
 import type { ExtensionSettings } from "../shared/types/settings";
-import type { SummaryResult, ProviderInfo } from "../shared/types/api";
+import type { SummaryResult, ProviderInfo, HistoryEntry } from "../shared/types/api";
 import { BUILTIN_PROVIDERS } from "../shared/constants/providers";
 import { summarize } from "../services/summarizer";
 import { validateProvider } from "../services/llm";
@@ -155,6 +155,20 @@ async function handleSummarize(
       baseUrl: providerConfig.baseUrl,
       apiFormat: customProvider?.apiFormat,
     });
+
+    // Save result to storage (persists even if sidepanel is closed)
+    const entry: HistoryEntry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      timestamp: Date.now(),
+      bvid: msg.bvid,
+      title: msg.title || "",
+      author: "",
+      result: data,
+    };
+    const historyData = await chrome.storage.local.get("history");
+    const history: HistoryEntry[] = historyData.history || [];
+    const newHistory = [entry, ...history].slice(0, 100);
+    await chrome.storage.local.set({ lastSummary: data, history: newHistory });
 
     sendResponse({ data });
   } catch (e) {
