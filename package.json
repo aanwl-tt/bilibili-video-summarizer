@@ -1,0 +1,8 @@
+{
+  "name": "bilibili-video-summarizer",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter extension dev",
+    "build": "pnpm --filter extension build"
+  }
+}

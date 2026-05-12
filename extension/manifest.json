@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Bilibili Summarizer",
+  "version": "0.1.0",
+  "description": "AI-powered structured notes for Bilibili videos",
+  "permissions": ["storage", "sidePanel", "tabs"],
+  "host_permissions": [
+    "*://*.bilibili.com/*",
+    "https://api.anthropic.com/*",
+    "https://api.openai.com/*",
+    "https://api.deepseek.com/*",
+    "http://localhost:11434/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.bilibili.com/*"],
+      "js": ["content.js"],
+      "css": [],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_title": "Bilibili Summarizer",
+    "default_popup": "popup/index.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidepanel/index.html"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*"],
+      "matches": ["*://*.bilibili.com/*"]
+    }
+  ]
+}
