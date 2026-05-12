@@ -30,6 +30,8 @@ export default function App() {
       const msg = message as Record<string, unknown>;
       if (msg.type === "VIDEO_UPDATED") {
         setVideo(msg.payload as VideoMetadata);
+        setView("idle");
+        setError("");
       }
     };
     chrome.runtime.onMessage.addListener(listener);
@@ -52,7 +54,7 @@ export default function App() {
     setError("");
 
     chrome.runtime.sendMessage(
-      { type: "SUMMARIZE", bvid: video.bvid, cid: video.cid },
+      { type: "SUMMARIZE", bvid: video.bvid, cid: video.cid, title: video.title },
       (response: { data?: SummaryResult; error?: string } | undefined) => {
         if (chrome.runtime.lastError) {
           setError(chrome.runtime.lastError.message || "消息通道错误");

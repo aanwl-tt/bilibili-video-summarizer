@@ -77,7 +77,7 @@ async function saveSettings(payload: ExtensionSettings, sendResponse: (r: unknow
 }
 
 async function handleSummarize(
-  msg: { type: "SUMMARIZE"; bvid: string; cid: number },
+  msg: { type: "SUMMARIZE"; bvid: string; cid: number; title?: string },
   sendResponse: (r: unknown) => void
 ) {
   try {
@@ -98,6 +98,7 @@ async function handleSummarize(
     const data = await summarize({
       bvid: msg.bvid,
       cid: msg.cid,
+      title: msg.title,
       provider: settings.activeProvider,
       model: settings.activeModel,
       apiKey: providerConfig.apiKey,

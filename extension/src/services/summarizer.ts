@@ -6,6 +6,7 @@ import { SYSTEM_PROMPT_ZH, buildUserPrompt, parseJsonResponse } from "./prompt";
 export interface SummarizeInput {
   bvid: string;
   cid: number;
+  title?: string;
   provider: string;
   model: string;
   apiKey: string;
@@ -51,7 +52,7 @@ export async function summarize(input: SummarizeInput): Promise<SummaryResult> {
   }
 
   // 4. Build prompt
-  const title = `Bilibili Video (${input.bvid})`;
+  const title = input.title || `Bilibili Video (${input.bvid})`;
   const userPrompt = buildUserPrompt({
     title,
     duration,
