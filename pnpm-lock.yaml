@@ -10,9 +10,6 @@ importers:
 
   extension:
     dependencies:
-      '@bilibili-summarizer/shared':
-        specifier: workspace:*
-        version: link:../packages/shared
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -38,8 +35,6 @@ importers:
       vite:
         specifier: ^6.0.0
         version: 6.4.2
-
-  packages/shared: {}
 
 packages:
 

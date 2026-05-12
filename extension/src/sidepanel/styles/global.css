@@ -7,16 +7,43 @@
 :root {
   --primary: #fb7299;
   --primary-dark: #e55c7f;
+  --primary-light: #fff0f3;
   --bg: #ffffff;
-  --bg-secondary: #f5f5f5;
-  --text: #333333;
+  --bg-secondary: #f7f8fa;
+  --bg-card: #ffffff;
+  --text: #1a1a1a;
   --text-secondary: #666666;
+  --text-muted: #999999;
   --border: #e8e8e8;
   --tag-bg: #fff0f3;
   --tag-text: #fb7299;
   --success: #52c41a;
   --warning: #faad14;
   --error: #ff4d4f;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #ff85a6;
+    --primary-dark: #fb7299;
+    --primary-light: #2a1a1f;
+    --bg: #1a1a1a;
+    --bg-secondary: #242424;
+    --bg-card: #2a2a2a;
+    --text: #e8e8e8;
+    --text-secondary: #a0a0a0;
+    --text-muted: #666666;
+    --border: #3a3a3a;
+    --tag-bg: #2a1a1f;
+    --tag-text: #ff85a6;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
 }
 
 body {
@@ -33,9 +60,69 @@ body {
 button {
   font-family: inherit;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: translateY(0);
 }
 
 input, select {
   font-family: inherit;
   font-size: 13px;
+  transition: border-color 0.2s ease;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--primary) !important;
+}
+
+/* Animations */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s ease;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: var(--bg);
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 13px;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+  box-shadow: var(--shadow-md);
 }

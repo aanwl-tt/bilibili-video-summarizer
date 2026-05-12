@@ -40,7 +40,14 @@ chrome.runtime.onMessage.addListener(
         break;
 
       case "GET_CURRENT_VIDEO":
-        sendResponse(currentVideo);
+        if (currentVideo) {
+          sendResponse(currentVideo);
+        } else {
+          chrome.storage.local.get("currentVideo", (result) => {
+            sendResponse(result.currentVideo || null);
+          });
+          return true;
+        }
         break;
 
       case "SUMMARIZE":

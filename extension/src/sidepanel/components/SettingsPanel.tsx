@@ -27,12 +27,12 @@ export default function SettingsPanel({ settings, onSave }: Props) {
   };
 
   return (
-    <div style={{ marginBottom: 16 }}>
-      <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>⚙️ 设置</h3>
+    <div className="animate-slide-up" style={{ marginBottom: 16 }}>
+      <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>&#9881; 设置</h3>
 
       {/* LLM Providers */}
-      <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: "var(--text-secondary)" }}>
-        🤖 LLM 提供商
+      <h4 style={{ fontSize: 12, fontWeight: 600, marginBottom: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 1 }}>
+        LLM 提供商
       </h4>
 
       {BUILTIN_PROVIDERS.map((provider) => {
@@ -42,16 +42,19 @@ export default function SettingsPanel({ settings, onSave }: Props) {
           defaultModel: provider.models[0] || "",
           enabled: false,
         };
+        const isActive = local.activeProvider === provider.name;
 
         return (
           <div
             key={provider.name}
             style={{
-              padding: "10px 12px",
-              border: `1px solid ${local.activeProvider === provider.name ? "var(--primary)" : "var(--border)"}`,
-              borderRadius: 6,
+              padding: "10px 14px",
+              border: `1px solid ${isActive ? "var(--primary)" : "var(--border)"}`,
+              borderRadius: "var(--radius-md)",
               marginBottom: 8,
               cursor: "pointer",
+              background: isActive ? "var(--primary-light)" : "var(--bg-card)",
+              transition: "all 0.2s ease",
             }}
             onClick={() => {
               const targetConfig = local.providers[provider.name];
@@ -63,26 +66,32 @@ export default function SettingsPanel({ settings, onSave }: Props) {
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-              <input
-                type="radio"
-                checked={local.activeProvider === provider.name}
-                onChange={() => {
-                  const targetConfig = local.providers[provider.name];
-                  setLocal({
-                    ...local,
-                    activeProvider: provider.name,
-                    activeModel: targetConfig?.defaultModel || provider.models[0] || "",
-                  });
-                }}
-              />
+              <div style={{
+                width: 16,
+                height: 16,
+                borderRadius: "50%",
+                border: `2px solid ${isActive ? "var(--primary)" : "var(--border)"}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}>
+                {isActive && (
+                  <div style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: "var(--primary)",
+                  }} />
+                )}
+              </div>
               <span style={{ fontWeight: 500, fontSize: 13 }}>{provider.displayName}</span>
             </div>
 
-            {local.activeProvider === provider.name && (
-              <div style={{ paddingLeft: 24 }}>
+            {isActive && (
+              <div style={{ paddingLeft: 24, marginTop: 8 }}>
                 {provider.needsApiKey && (
-                  <div style={{ marginBottom: 6 }}>
-                    <label style={{ display: "block", fontSize: 11, color: "var(--text-secondary)" }}>
+                  <div style={{ marginBottom: 8 }}>
+                    <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>
                       API Key
                     </label>
                     <input
@@ -92,18 +101,20 @@ export default function SettingsPanel({ settings, onSave }: Props) {
                       placeholder="sk-..."
                       style={{
                         width: "100%",
-                        padding: "4px 8px",
+                        padding: "6px 10px",
                         border: "1px solid var(--border)",
-                        borderRadius: 4,
+                        borderRadius: "var(--radius-sm)",
                         fontSize: 12,
+                        background: "var(--bg)",
+                        color: "var(--text)",
                       }}
                     />
                   </div>
                 )}
 
                 {provider.needsBaseUrl && (
-                  <div style={{ marginBottom: 6 }}>
-                    <label style={{ display: "block", fontSize: 11, color: "var(--text-secondary)" }}>
+                  <div style={{ marginBottom: 8 }}>
+                    <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>
                       Base URL
                     </label>
                     <input
@@ -113,17 +124,19 @@ export default function SettingsPanel({ settings, onSave }: Props) {
                       placeholder={provider.name === "ollama" ? "http://localhost:11434" : "https://..."}
                       style={{
                         width: "100%",
-                        padding: "4px 8px",
+                        padding: "6px 10px",
                         border: "1px solid var(--border)",
-                        borderRadius: 4,
+                        borderRadius: "var(--radius-sm)",
                         fontSize: 12,
+                        background: "var(--bg)",
+                        color: "var(--text)",
                       }}
                     />
                   </div>
                 )}
 
                 <div style={{ marginBottom: 6 }}>
-                  <label style={{ display: "block", fontSize: 11, color: "var(--text-secondary)" }}>
+                  <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>
                     模型
                   </label>
                   {provider.models.length > 0 ? (
@@ -135,10 +148,12 @@ export default function SettingsPanel({ settings, onSave }: Props) {
                       }}
                       style={{
                         width: "100%",
-                        padding: "4px 8px",
+                        padding: "6px 10px",
                         border: "1px solid var(--border)",
-                        borderRadius: 4,
+                        borderRadius: "var(--radius-sm)",
                         fontSize: 12,
+                        background: "var(--bg)",
+                        color: "var(--text)",
                       }}
                     >
                       {provider.models.map((m) => (
@@ -156,10 +171,12 @@ export default function SettingsPanel({ settings, onSave }: Props) {
                       placeholder="输入模型名称（如 qwen3:14b）"
                       style={{
                         width: "100%",
-                        padding: "4px 8px",
+                        padding: "6px 10px",
                         border: "1px solid var(--border)",
-                        borderRadius: 4,
+                        borderRadius: "var(--radius-sm)",
                         fontSize: 12,
+                        background: "var(--bg)",
+                        color: "var(--text)",
                       }}
                     />
                   )}
@@ -171,8 +188,8 @@ export default function SettingsPanel({ settings, onSave }: Props) {
       })}
 
       {/* Default Depth */}
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ display: "block", fontSize: 12, color: "var(--text-secondary)", marginBottom: 4 }}>
+      <div style={{ marginTop: 16, marginBottom: 14 }}>
+        <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
           默认总结深度
         </label>
         <select
@@ -185,9 +202,11 @@ export default function SettingsPanel({ settings, onSave }: Props) {
           }
           style={{
             width: "100%",
-            padding: "6px 10px",
+            padding: "8px 12px",
             border: "1px solid var(--border)",
-            borderRadius: 4,
+            borderRadius: "var(--radius-sm)",
+            background: "var(--bg)",
+            color: "var(--text)",
           }}
         >
           {DEPTH_OPTIONS.map((opt) => (
@@ -203,16 +222,17 @@ export default function SettingsPanel({ settings, onSave }: Props) {
         onClick={() => onSave(local)}
         style={{
           width: "100%",
-          padding: "8px 0",
+          padding: "10px 0",
           background: "var(--primary)",
           border: "none",
-          borderRadius: 6,
+          borderRadius: "var(--radius-md)",
           color: "#fff",
           fontSize: 14,
           fontWeight: 600,
+          boxShadow: "0 4px 12px rgba(251, 114, 153, 0.25)",
         }}
       >
-        💾 保存设置
+        &#128190; 保存设置
       </button>
     </div>
   );
