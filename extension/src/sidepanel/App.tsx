@@ -257,6 +257,7 @@ export default function App() {
       {view === "settings" && (
         <SettingsPanel
           settings={settings}
+          showToast={showToast}
           onSave={(s) => {
             setSettings(s);
             chrome.runtime.sendMessage({ type: "SAVE_SETTINGS", payload: s });

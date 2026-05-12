@@ -70,6 +70,8 @@ export interface ProviderInfo {
   models: string[];
   needsBaseUrl: boolean;
   needsApiKey: boolean;
+  apiFormat?: "openai" | "anthropic";
+  isCustom?: boolean;
 }
 
 export interface HistoryEntry {

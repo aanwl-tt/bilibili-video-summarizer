@@ -11,6 +11,7 @@ export interface SummarizeInput {
   model: string;
   apiKey: string;
   baseUrl?: string;
+  apiFormat?: "openai" | "anthropic";
   options?: {
     maxTokens?: number;
     temperature?: number;
@@ -74,7 +75,7 @@ export async function summarize(input: SummarizeInput): Promise<SummaryResult> {
   };
 
   // 5. Call LLM
-  const response = await callLLM(input.provider, messages, config);
+  const response = await callLLM(input.provider, messages, config, input.apiFormat);
 
   // 6. Parse response
   const parsed = parseJsonResponse(response.content) as Record<string, unknown>;

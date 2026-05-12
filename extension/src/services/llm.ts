@@ -33,7 +33,8 @@ async function callClaude(messages: LLMMessage[], config: LLMConfig): Promise<LL
   };
   if (systemMsg) body.system = systemMsg.content;
 
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+  const baseUrl = (config.baseUrl || "https://api.anthropic.com").replace(/\/+$/, "");
+  const resp = await fetch(`${baseUrl}/v1/messages`, {
     method: "POST",
     headers: {
       "x-api-key": config.apiKey,
@@ -159,11 +160,31 @@ const PROVIDER_MAP: Record<string, (m: LLMMessage[], c: LLMConfig) => Promise<LL
 export async function callLLM(
   provider: string,
   messages: LLMMessage[],
-  config: LLMConfig
+  config: LLMConfig,
+  apiFormat?: "openai" | "anthropic"
 ): Promise<LLMResponse> {
+  // Custom provider uses explicit apiFormat
+  if (apiFormat) {
+    const fn = apiFormat === "anthropic" ? callClaude : callOpenAI;
+    return fn(messages, config);
+  }
   const fn = PROVIDER_MAP[provider];
   if (!fn) {
     throw new Error(`Unknown LLM provider: ${provider}. Supported: ${Object.keys(PROVIDER_MAP).join(", ")}`);
   }
   return fn(messages, config);
+}
+
+export async function validateProvider(
+  apiFormat: "openai" | "anthropic",
+  config: LLMConfig
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const testMessages: LLMMessage[] = [{ role: "user", content: "Hi" }];
+    const fn = apiFormat === "anthropic" ? callClaude : callOpenAI;
+    await fn(testMessages, { ...config, maxTokens: 10, temperature: 0 });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
 }

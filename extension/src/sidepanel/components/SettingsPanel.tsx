@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import type { ExtensionSettings, ProviderConfig } from "../../shared/types/settings";
+import type { ProviderInfo } from "../../shared/types/api";
 import { BUILTIN_PROVIDERS } from "../../shared/constants/providers";
 
 interface Props {
   settings: ExtensionSettings;
   onSave: (settings: ExtensionSettings) => void;
+  showToast?: (msg: string) => void;
 }
 
 const DEPTH_OPTIONS = [
@@ -13,8 +15,25 @@ const DEPTH_OPTIONS = [
   { value: "key_points" as const, label: "关键点" },
 ];
 
-export default function SettingsPanel({ settings, onSave }: Props) {
-  const [local, setLocal] = useState<ExtensionSettings>({ ...settings });
+type ValidateStatus = "idle" | "validating" | "success" | "error";
+
+export default function SettingsPanel({ settings, onSave, showToast }: Props) {
+  const [local, setLocal] = useState<ExtensionSettings>({ ...settings, customProviders: settings.customProviders || [] });
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newProvider, setNewProvider] = useState({
+    name: "",
+    apiFormat: "openai" as "openai" | "anthropic",
+    baseUrl: "",
+    apiKey: "",
+    model: "",
+  });
+  const [validateStatus, setValidateStatus] = useState<ValidateStatus>("idle");
+  const [validateError, setValidateError] = useState("");
+
+  const allProviders: ProviderInfo[] = [
+    ...BUILTIN_PROVIDERS,
+    ...(local.customProviders || []),
+  ];
 
   const updateProvider = (name: string, partial: Partial<ProviderConfig>) => {
     setLocal({
@@ -26,6 +45,83 @@ export default function SettingsPanel({ settings, onSave }: Props) {
     });
   };
 
+  const handleValidate = () => {
+    setValidateStatus("validating");
+    setValidateError("");
+    chrome.runtime.sendMessage(
+      {
+        type: "VALIDATE_PROVIDER",
+        payload: {
+          apiFormat: newProvider.apiFormat,
+          apiKey: newProvider.apiKey,
+          baseUrl: newProvider.baseUrl,
+          model: newProvider.model,
+        },
+      },
+      (response: { ok: boolean; error?: string }) => {
+        if (chrome.runtime.lastError) {
+          setValidateStatus("error");
+          setValidateError("验证请求失败");
+          return;
+        }
+        if (response.ok) {
+          setValidateStatus("success");
+        } else {
+          setValidateStatus("error");
+          setValidateError(response.error || "验证失败");
+        }
+      }
+    );
+  };
+
+  const handleAddProvider = () => {
+    if (!newProvider.name || !newProvider.baseUrl || !newProvider.model) return;
+
+    const id = `custom_${Date.now()}`;
+    const providerInfo: ProviderInfo = {
+      name: id,
+      displayName: newProvider.name,
+      models: [newProvider.model],
+      needsBaseUrl: true,
+      needsApiKey: true,
+      apiFormat: newProvider.apiFormat,
+      isCustom: true,
+    };
+
+    const updatedSettings: ExtensionSettings = {
+      ...local,
+      customProviders: [...(local.customProviders || []), providerInfo],
+      providers: {
+        ...local.providers,
+        [id]: {
+          apiKey: newProvider.apiKey,
+          baseUrl: newProvider.baseUrl,
+          defaultModel: newProvider.model,
+          enabled: true,
+        },
+      },
+    };
+
+    setLocal(updatedSettings);
+    setShowAddForm(false);
+    setNewProvider({ name: "", apiFormat: "openai", baseUrl: "", apiKey: "", model: "" });
+    setValidateStatus("idle");
+    setValidateError("");
+    showToast?.("自定义提供商已添加");
+  };
+
+  const handleDeleteProvider = (name: string) => {
+    const updatedCustom = (local.customProviders || []).filter((p) => p.name !== name);
+    const { [name]: _, ...restProviders } = local.providers;
+    setLocal({
+      ...local,
+      customProviders: updatedCustom,
+      providers: restProviders,
+      activeProvider: local.activeProvider === name ? "claude" : local.activeProvider,
+    });
+    showToast?.("已删除自定义提供商");
+  };
+
   return (
     <div className="animate-slide-up" style={{ marginBottom: 16 }}>
       <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>&#9881; 设置</h3>
@@ -35,7 +131,7 @@ export default function SettingsPanel({ settings, onSave }: Props) {
         LLM 提供商
       </h4>
 
-      {BUILTIN_PROVIDERS.map((provider) => {
+      {allProviders.map((provider) => {
         const config = local.providers[provider.name] || {
           apiKey: "",
           baseUrl: undefined,
@@ -57,11 +153,10 @@ export default function SettingsPanel({ settings, onSave }: Props) {
               transition: "all 0.2s ease",
             }}
             onClick={() => {
-              const targetConfig = local.providers[provider.name];
               setLocal({
                 ...local,
                 activeProvider: provider.name,
-                activeModel: targetConfig?.defaultModel || provider.models[0] || "",
+                activeModel: config.defaultModel || provider.models[0] || "",
               });
             }}
           >
@@ -76,15 +171,29 @@ export default function SettingsPanel({ settings, onSave }: Props) {
                 justifyContent: "center",
               }}>
                 {isActive && (
-                  <div style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    background: "var(--primary)",
-                  }} />
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--primary)" }} />
                 )}
               </div>
-              <span style={{ fontWeight: 500, fontSize: 13 }}>{provider.displayName}</span>
+              <span style={{ fontWeight: 500, fontSize: 13, flex: 1 }}>{provider.displayName}</span>
+              {provider.isCustom && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteProvider(provider.name);
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--error)",
+                    fontSize: 16,
+                    padding: "0 4px",
+                    cursor: "pointer",
+                  }}
+                  title="删除"
+                >
+                  &#10005;
+                </button>
+              )}
             </div>
 
             {isActive && (
@@ -139,7 +248,7 @@ export default function SettingsPanel({ settings, onSave }: Props) {
                   <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>
                     模型
                   </label>
-                  {provider.models.length > 0 ? (
+                  {provider.models.length > 0 && !provider.isCustom ? (
                     <select
                       value={config.defaultModel}
                       onChange={(e) => {
@@ -168,7 +277,7 @@ export default function SettingsPanel({ settings, onSave }: Props) {
                         updateProvider(provider.name, { defaultModel: e.target.value });
                         setLocal((prev) => ({ ...prev, activeModel: e.target.value }));
                       }}
-                      placeholder="输入模型名称（如 qwen3:14b）"
+                      placeholder="输入模型名称"
                       style={{
                         width: "100%",
                         padding: "6px 10px",
@@ -187,18 +296,171 @@ export default function SettingsPanel({ settings, onSave }: Props) {
         );
       })}
 
+      {/* Add Custom Provider */}
+      {!showAddForm ? (
+        <button
+          onClick={() => setShowAddForm(true)}
+          style={{
+            width: "100%",
+            padding: "8px 0",
+            background: "var(--bg-secondary)",
+            border: "1px dashed var(--border)",
+            borderRadius: "var(--radius-md)",
+            fontSize: 13,
+            color: "var(--text-secondary)",
+            marginBottom: 16,
+          }}
+        >
+          + 添加自定义提供商
+        </button>
+      ) : (
+        <div style={{
+          padding: "12px 14px",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius-md)",
+          marginBottom: 16,
+          background: "var(--bg-secondary)",
+        }}>
+          <h4 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>添加自定义提供商</h4>
+
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>名称</label>
+            <input
+              type="text"
+              value={newProvider.name}
+              onChange={(e) => setNewProvider({ ...newProvider, name: e.target.value })}
+              placeholder="我的 LLM 服务"
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: 12, background: "var(--bg)", color: "var(--text)" }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>API 格式</label>
+            <select
+              value={newProvider.apiFormat}
+              onChange={(e) => setNewProvider({ ...newProvider, apiFormat: e.target.value as "openai" | "anthropic" })}
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: 12, background: "var(--bg)", color: "var(--text)" }}
+            >
+              <option value="openai">OpenAI 兼容</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+          </div>
+
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>Base URL</label>
+            <input
+              type="text"
+              value={newProvider.baseUrl}
+              onChange={(e) => setNewProvider({ ...newProvider, baseUrl: e.target.value })}
+              placeholder="https://api.example.com"
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: 12, background: "var(--bg)", color: "var(--text)" }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 8 }}>
+            <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>API Key</label>
+            <input
+              type="password"
+              value={newProvider.apiKey}
+              onChange={(e) => setNewProvider({ ...newProvider, apiKey: e.target.value })}
+              placeholder="sk-..."
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: 12, background: "var(--bg)", color: "var(--text)" }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ display: "block", fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>模型名称</label>
+            <input
+              type="text"
+              value={newProvider.model}
+              onChange={(e) => setNewProvider({ ...newProvider, model: e.target.value })}
+              placeholder="gpt-4o"
+              style={{ width: "100%", padding: "6px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: 12, background: "var(--bg)", color: "var(--text)" }}
+            />
+          </div>
+
+          {/* Validate button & status */}
+          <div style={{ marginBottom: 10 }}>
+            <button
+              onClick={handleValidate}
+              disabled={validateStatus === "validating" || !newProvider.baseUrl || !newProvider.apiKey || !newProvider.model}
+              style={{
+                padding: "5px 16px",
+                background: validateStatus === "success" ? "var(--success)" : validateStatus === "error" ? "var(--error)" : "var(--bg)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                fontSize: 12,
+                color: validateStatus === "idle" ? "var(--text)" : "#fff",
+                fontWeight: 500,
+                cursor: validateStatus === "validating" ? "wait" : "pointer",
+              }}
+            >
+              {validateStatus === "idle" && "验证配置"}
+              {validateStatus === "validating" && "验证中..."}
+              {validateStatus === "success" && "验证通过"}
+              {validateStatus === "error" && "验证失败"}
+            </button>
+            {validateStatus === "error" && validateError && (
+              <p style={{ fontSize: 11, color: "var(--error)", marginTop: 6, wordBreak: "break-all" }}>
+                {validateError}
+              </p>
+            )}
+            {validateStatus === "success" && (
+              <p style={{ fontSize: 11, color: "var(--success)", marginTop: 6 }}>
+                配置正确，可以正常使用
+              </p>
+            )}
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={handleAddProvider}
+              disabled={!newProvider.name || !newProvider.baseUrl || !newProvider.model}
+              style={{
+                flex: 1,
+                padding: "7px 0",
+                background: "var(--primary)",
+                border: "none",
+                borderRadius: "var(--radius-sm)",
+                fontSize: 13,
+                color: "#fff",
+                fontWeight: 500,
+              }}
+            >
+              添加
+            </button>
+            <button
+              onClick={() => {
+                setShowAddForm(false);
+                setValidateStatus("idle");
+                setValidateError("");
+              }}
+              style={{
+                flex: 1,
+                padding: "7px 0",
+                background: "var(--bg)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                fontSize: 13,
+                color: "var(--text-secondary)",
+              }}
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Default Depth */}
-      <div style={{ marginTop: 16, marginBottom: 14 }}>
+      <div style={{ marginBottom: 14 }}>
         <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
           默认总结深度
         </label>
         <select
           value={local.defaultDepth}
           onChange={(e) =>
-            setLocal({
-              ...local,
-              defaultDepth: e.target.value as "full_notes" | "brief" | "key_points",
-            })
+            setLocal({ ...local, defaultDepth: e.target.value as "full_notes" | "brief" | "key_points" })
           }
           style={{
             width: "100%",
@@ -210,9 +472,7 @@ export default function SettingsPanel({ settings, onSave }: Props) {
           }}
         >
           {DEPTH_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
       </div>

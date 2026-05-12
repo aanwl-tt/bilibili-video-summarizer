@@ -1,13 +1,15 @@
 import type { VideoMetadata } from "../shared/types/video";
 import type { ExtensionSettings } from "../shared/types/settings";
-import type { SummaryResult } from "../shared/types/api";
+import type { SummaryResult, ProviderInfo } from "../shared/types/api";
 import { BUILTIN_PROVIDERS } from "../shared/constants/providers";
 import { summarize } from "../services/summarizer";
+import { validateProvider } from "../services/llm";
 
 const DEFAULT_SETTINGS: ExtensionSettings = {
   activeProvider: "claude",
   activeModel: "claude-sonnet-4-6",
   defaultDepth: "full_notes",
+  customProviders: [],
   providers: Object.fromEntries(
     BUILTIN_PROVIDERS.map((p) => [
       p.name,
@@ -83,6 +85,13 @@ chrome.runtime.onMessage.addListener(
       case "SAVE_SETTINGS":
         saveSettings(msg.payload as ExtensionSettings, sendResponse);
         return true;
+
+      case "VALIDATE_PROVIDER":
+        handleValidateProvider(
+          msg.payload as { apiFormat: "openai" | "anthropic"; apiKey: string; baseUrl: string; model: string },
+          sendResponse
+        );
+        return true;
     }
   }
 );
@@ -96,6 +105,20 @@ async function getSettings(sendResponse: (r: unknown) => void) {
 async function saveSettings(payload: ExtensionSettings, sendResponse: (r: unknown) => void) {
   await chrome.storage.local.set({ settings: payload });
   sendResponse({ ok: true });
+}
+
+async function handleValidateProvider(
+  payload: { apiFormat: "openai" | "anthropic"; apiKey: string; baseUrl: string; model: string },
+  sendResponse: (r: unknown) => void
+) {
+  const result = await validateProvider(payload.apiFormat, {
+    apiKey: payload.apiKey,
+    baseUrl: payload.baseUrl,
+    model: payload.model,
+    maxTokens: 10,
+    temperature: 0,
+  });
+  sendResponse(result);
 }
 
 async function handleSummarize(
@@ -117,6 +140,11 @@ async function handleSummarize(
       return;
     }
 
+    // Find apiFormat for custom providers
+    const customProvider = (settings.customProviders || []).find(
+      (p: ProviderInfo) => p.name === settings.activeProvider
+    );
+
     const data = await summarize({
       bvid: msg.bvid,
       cid: msg.cid,
@@ -125,6 +153,7 @@ async function handleSummarize(
       model: settings.activeModel,
       apiKey: providerConfig.apiKey,
       baseUrl: providerConfig.baseUrl,
+      apiFormat: customProvider?.apiFormat,
     });
 
     sendResponse({ data });

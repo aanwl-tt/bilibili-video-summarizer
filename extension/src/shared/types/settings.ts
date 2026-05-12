@@ -1,3 +1,5 @@
+import type { ProviderInfo } from "./api";
+
 export interface ProviderConfig {
   apiKey: string;
   baseUrl?: string;
@@ -10,4 +12,5 @@ export interface ExtensionSettings {
   activeProvider: string;
   activeModel: string;
   defaultDepth: "full_notes" | "brief" | "key_points";
+  customProviders: ProviderInfo[];
 }
