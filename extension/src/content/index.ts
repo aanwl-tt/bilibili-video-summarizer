@@ -185,8 +185,8 @@ async function init() {
   setTimeout(init, 2000);
 }
 
-// Listen for seek commands from side panel
-chrome.runtime.onMessage.addListener((message) => {
+// Listen for messages from side panel and background
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   const msg = message as Record<string, unknown>;
   if (msg.type === "SEEK_VIDEO") {
     const payload = msg.payload as { time: number };
@@ -195,6 +195,10 @@ chrome.runtime.onMessage.addListener((message) => {
       video.currentTime = payload.time;
       video.play().catch(() => {});
     }
+  }
+  if (msg.type === "TAB_CHANGED") {
+    sendResponse({ video: currentMeta });
+    return true;
   }
 });
 

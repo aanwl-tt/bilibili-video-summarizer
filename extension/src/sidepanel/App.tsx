@@ -33,6 +33,12 @@ export default function App() {
         setView("idle");
         setError("");
       }
+      if (msg.type === "VIDEO_CLEARED") {
+        setVideo(null);
+        setResult(null);
+        setView("idle");
+        setError("");
+      }
     };
     chrome.runtime.onMessage.addListener(listener);
     return () => chrome.runtime.onMessage.removeListener(listener);

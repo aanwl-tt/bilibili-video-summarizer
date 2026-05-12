@@ -19,6 +19,28 @@ const DEFAULT_SETTINGS: ExtensionSettings = {
 // Cache for current video metadata
 let currentVideo: VideoMetadata | null = null;
 
+// Detect tab switch / navigation → clear video if not on a Bilibili video page
+function checkActiveTab() {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const tab = tabs[0];
+    if (!tab?.id) return;
+    chrome.tabs.sendMessage(tab.id, { type: "TAB_CHANGED" }, (response) => {
+      if (chrome.runtime.lastError || !response?.video) {
+        currentVideo = null;
+        chrome.storage.local.remove("currentVideo");
+        chrome.runtime.sendMessage({ type: "VIDEO_CLEARED" }).catch(() => {});
+      }
+    });
+  });
+}
+
+chrome.tabs.onActivated.addListener(checkActiveTab);
+chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
+  if (changeInfo.url || changeInfo.status === "complete") {
+    checkActiveTab();
+  }
+});
+
 chrome.runtime.onMessage.addListener(
   (message: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => {
     const msg = message as Record<string, unknown>;
