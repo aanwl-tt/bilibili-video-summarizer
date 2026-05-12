@@ -8,3 +8,5 @@ __pycache__/
 *.egg-info/
 废案/
 .claude/
+CLAUDE.md
+反馈.txt
