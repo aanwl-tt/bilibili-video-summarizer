@@ -170,8 +170,8 @@ async function handleSummarize(
     const newHistory = [entry, ...history].slice(0, 100);
     await chrome.storage.local.set({ lastSummary: data, history: newHistory });
 
-    sendResponse({ data });
+    try { sendResponse({ data }); } catch {}
   } catch (e) {
-    sendResponse({ error: `Failed to summarize: ${e instanceof Error ? e.message : String(e)}` });
+    try { sendResponse({ error: `Failed to summarize: ${e instanceof Error ? e.message : String(e)}` }); } catch {}
   }
 }
