@@ -10,6 +10,7 @@ const DEFAULT_SETTINGS: ExtensionSettings = {
   activeModel: "claude-sonnet-4-6",
   defaultDepth: "full_notes",
   customProviders: [],
+  autoSummarize: false,
   providers: Object.fromEntries(
     BUILTIN_PROVIDERS.map((p) => [
       p.name,
@@ -20,6 +21,10 @@ const DEFAULT_SETTINGS: ExtensionSettings = {
 
 // Cache for current video metadata
 let currentVideo: VideoMetadata | null = null;
+
+// Auto-summarize timer
+let autoSummarizeTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingBvid: string | null = null;
 
 // Detect tab switch / navigation → clear video if not on a Bilibili video page
 function checkActiveTab() {
@@ -53,13 +58,14 @@ chrome.runtime.onMessage.addListener(
         // Notify side panel if open
         chrome.runtime.sendMessage({ type: "VIDEO_UPDATED", payload: currentVideo }).catch(() => {});
         sendResponse({ ok: true });
+
+        // Auto-summarize if enabled
+        triggerAutoSummarize(currentVideo);
         break;
 
       case "OPEN_SUMMARIZE":
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-          const tabId = tabs[0]?.id;
-          chrome.sidePanel.open({ tabId: tabId as number } as chrome.sidePanel.OpenOptions).catch(() => {});
-        });
+        // Floating panel handles this via content script event
+        // Side panel can still be opened via popup
         sendResponse({ ok: true });
         break;
 
@@ -126,6 +132,16 @@ async function handleSummarize(
   sendResponse: (r: unknown) => void
 ) {
   try {
+    // Check cache first
+    const historyData = await chrome.storage.local.get("history");
+    const history: HistoryEntry[] = historyData.history || [];
+    const cached = history.find((h) => h.bvid === msg.bvid);
+    if (cached) {
+      await chrome.storage.local.set({ lastSummary: cached.result });
+      sendResponse({ data: cached.result });
+      return;
+    }
+
     const result = await chrome.storage.local.get("settings");
     const settings: ExtensionSettings = result.settings || DEFAULT_SETTINGS;
 
@@ -145,11 +161,14 @@ async function handleSummarize(
       (p: ProviderInfo) => p.name === settings.activeProvider
     );
 
+    const providerDisplayName = customProvider?.displayName || settings.activeProvider;
+
     const data = await summarize({
       bvid: msg.bvid,
       cid: msg.cid,
       title: msg.title,
       provider: settings.activeProvider,
+      providerDisplayName,
       model: settings.activeModel,
       apiKey: providerConfig.apiKey,
       baseUrl: providerConfig.baseUrl,
@@ -165,13 +184,89 @@ async function handleSummarize(
       author: "",
       result: data,
     };
-    const historyData = await chrome.storage.local.get("history");
-    const history: HistoryEntry[] = historyData.history || [];
-    const newHistory = [entry, ...history].slice(0, 100);
+    const existingHistoryData = await chrome.storage.local.get("history");
+    const existingHistory: HistoryEntry[] = existingHistoryData.history || [];
+    const newHistory = [entry, ...existingHistory].slice(0, 100);
     await chrome.storage.local.set({ lastSummary: data, history: newHistory });
 
     try { sendResponse({ data }); } catch {}
   } catch (e) {
     try { sendResponse({ error: `Failed to summarize: ${e instanceof Error ? e.message : String(e)}` }); } catch {}
   }
+}
+
+async function triggerAutoSummarize(video: VideoMetadata) {
+  // Clear previous timer
+  if (autoSummarizeTimer) {
+    clearTimeout(autoSummarizeTimer);
+    autoSummarizeTimer = null;
+  }
+
+  pendingBvid = video.bvid;
+
+  // Check settings
+  const result = await chrome.storage.local.get("settings");
+  const settings: ExtensionSettings = result.settings || DEFAULT_SETTINGS;
+
+  if (!settings.autoSummarize) return;
+
+  // Delay 5 seconds to avoid rapid video switches
+  autoSummarizeTimer = setTimeout(async () => {
+    // Check if still on the same video
+    if (pendingBvid !== video.bvid) return;
+
+    // Check cache
+    const historyData = await chrome.storage.local.get("history");
+    const history: HistoryEntry[] = historyData.history || [];
+    const cached = history.find((h) => h.bvid === video.bvid);
+    if (cached) {
+      await chrome.storage.local.set({ lastSummary: cached.result });
+      return;
+    }
+
+    // Check provider config
+    const providerConfig = settings.providers[settings.activeProvider];
+    if (!providerConfig || (!providerConfig.apiKey && settings.activeProvider !== "ollama")) {
+      return; // Skip if not configured
+    }
+
+    try {
+      const customProvider = (settings.customProviders || []).find(
+        (p: ProviderInfo) => p.name === settings.activeProvider
+      );
+
+      const providerDisplayName = customProvider?.displayName || settings.activeProvider;
+
+      const data = await summarize({
+        bvid: video.bvid,
+        cid: video.cid,
+        title: video.title,
+        provider: settings.activeProvider,
+        providerDisplayName,
+        model: settings.activeModel,
+        apiKey: providerConfig.apiKey,
+        baseUrl: providerConfig.baseUrl,
+        apiFormat: customProvider?.apiFormat,
+      });
+
+      // Save result
+      const entry: HistoryEntry = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        timestamp: Date.now(),
+        bvid: video.bvid,
+        title: video.title || "",
+        author: "",
+        result: data,
+      };
+      const newHistoryData = await chrome.storage.local.get("history");
+      const newHistory: HistoryEntry[] = newHistoryData.history || [];
+      const updatedHistory = [entry, ...newHistory].slice(0, 100);
+      await chrome.storage.local.set({ lastSummary: data, history: updatedHistory });
+
+      // Notify UI
+      chrome.runtime.sendMessage({ type: "SUMMARY_READY", payload: data }).catch(() => {});
+    } catch (e) {
+      console.error("[Bilibili Summarizer] Auto-summarize failed:", e);
+    }
+  }, 5000);
 }

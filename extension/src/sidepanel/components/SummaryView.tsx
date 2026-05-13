@@ -144,7 +144,7 @@ export default function SummaryView({ result, onSeek, showToast }: Props) {
       </div>
 
       {/* Chapters */}
-      <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
+      <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: "var(--text)" }}>
         &#128209; 章节笔记 ({result.chapters.length})
       </h3>
       {result.chapters.map((ch, i) => (
@@ -186,6 +186,9 @@ export default function SummaryView({ result, onSeek, showToast }: Props) {
         <span>{result.source_subtitles_count} 条字幕</span>
         <span>{(result.processing_time_ms / 1000).toFixed(1)}s</span>
         <span>{result.provider_used}</span>
+        {(result.input_tokens != null || result.output_tokens != null) && (
+          <span>{result.input_tokens ?? 0} / {result.output_tokens ?? 0} tokens</span>
+        )}
       </div>
 
       {/* Actions */}

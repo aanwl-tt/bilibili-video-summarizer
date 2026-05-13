@@ -92,6 +92,9 @@ function injectSummarizeButton() {
     if (currentMeta) {
       chrome.storage.local.set({ currentVideo: currentMeta }).catch(() => {});
     }
+    // Open floating panel directly
+    window.dispatchEvent(new CustomEvent("bili-summarizer-open"));
+    // Also notify background (for side panel fallback)
     try {
       chrome.runtime.sendMessage({ type: "OPEN_SUMMARIZE" });
     } catch {
@@ -157,6 +160,7 @@ async function init() {
       console.log("[Bilibili Summarizer] Video detected:", currentMeta.bvid);
       chrome.runtime.sendMessage({ type: "VIDEO_DETECTED", payload: currentMeta }).catch(() => {});
       chrome.storage.local.set({ currentVideo: currentMeta }).catch(() => {});
+      window.dispatchEvent(new CustomEvent("bili-summarizer-video-changed", { detail: currentMeta }));
       setTimeout(injectSummarizeButton, 1000);
       return;
     }
@@ -177,6 +181,7 @@ async function init() {
       hasSubtitles: false,
     };
     chrome.runtime.sendMessage({ type: "VIDEO_DETECTED", payload: currentMeta }).catch(() => {});
+    window.dispatchEvent(new CustomEvent("bili-summarizer-video-changed", { detail: currentMeta }));
     setTimeout(injectSummarizeButton, 1000);
     return;
   }
@@ -200,6 +205,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ video: currentMeta });
     return true;
   }
+  if (msg.type === "REFRESH_VIDEO") {
+    init().then(() => sendResponse({ video: currentMeta }));
+    return true;
+  }
 });
 
 // Run on page load
@@ -209,16 +218,26 @@ if (document.readyState === "loading") {
   init();
 }
 
-// Watch for SPA navigation (Bilibili uses vue-router)
+// Watch for SPA navigation (Bilibili uses vue-router + pushState)
 let lastUrl = location.href;
-new MutationObserver(() => {
-  // Re-inject button if it was removed by SPA re-render
-  if (!document.getElementById("bili-summarizer-btn") && !!getBvidFromUrl()) {
-    injectSummarizeButton();
-  }
-  // Re-init on URL change
+
+function checkUrlChange() {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
     setTimeout(init, 1000);
   }
+}
+
+// Method 1: MutationObserver for DOM changes
+new MutationObserver(() => {
+  if (!document.getElementById("bili-summarizer-btn") && !!getBvidFromUrl()) {
+    injectSummarizeButton();
+  }
+  checkUrlChange();
 }).observe(document.body, { childList: true, subtree: true, attributes: false });
+
+// Method 2: popstate for back/forward navigation
+window.addEventListener("popstate", checkUrlChange);
+
+// Method 3: Periodic URL check (catches pushState that doesn't trigger DOM changes)
+setInterval(checkUrlChange, 2000);

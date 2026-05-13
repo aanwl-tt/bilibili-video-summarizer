@@ -13,4 +13,5 @@ export interface ExtensionSettings {
   activeModel: string;
   defaultDepth: "full_notes" | "brief" | "key_points";
   customProviders: ProviderInfo[];
+  autoSummarize?: boolean;
 }

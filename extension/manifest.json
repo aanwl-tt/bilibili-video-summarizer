@@ -21,6 +21,12 @@
       "js": ["content.js"],
       "css": [],
       "run_at": "document_end"
+    },
+    {
+      "matches": ["*://*.bilibili.com/*"],
+      "js": ["floating.js"],
+      "css": [],
+      "run_at": "document_idle"
     }
   ],
   "action": {

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite build --watch",
-    "build": "tsc && vite build && node -e \"const fs=require('fs');const p=require('path');fs.copyFileSync('manifest.json',p.join('dist','manifest.json'));for(const d of['sidepanel','popup']){const s=p.join('dist','src',d),t=p.join('dist',d);if(fs.existsSync(s)){fs.cpSync(s,t,{recursive:true});fs.rmSync(s,{recursive:true})}}if(fs.existsSync('dist/src')&&fs.readdirSync('dist/src').length===0)fs.rmdirSync('dist/src')\"",
+    "build": "tsc && vite build && vite build --config vite.floating.config.ts && node -e \"const fs=require('fs');const p=require('path');fs.copyFileSync('manifest.json',p.join('dist','manifest.json'));for(const d of['sidepanel','popup']){const s=p.join('dist','src',d),t=p.join('dist',d);if(fs.existsSync(s)){fs.cpSync(s,t,{recursive:true});fs.rmSync(s,{recursive:true})}}if(fs.existsSync('dist/src')&&fs.readdirSync('dist/src').length===0)fs.rmdirSync('dist/src')\"",
     "preview": "vite preview"
   },
   "dependencies": {

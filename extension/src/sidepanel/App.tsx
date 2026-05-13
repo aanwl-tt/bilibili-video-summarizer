@@ -25,18 +25,29 @@ export default function App() {
 
     chrome.runtime.sendMessage({ type: "GET_CURRENT_VIDEO" }, (v) => {
       if (chrome.runtime.lastError) return;
-      if (v) setVideo(v as VideoMetadata);
-    });
+      if (v) {
+        const currentVideo = v as VideoMetadata;
+        setVideo(currentVideo);
 
-    // Restore saved summary
-    chrome.storage.local.get(["lastSummary", "history"], (data) => {
-      if (chrome.runtime.lastError) return;
-      if (data.lastSummary) {
-        setResult(data.lastSummary as SummaryResult);
-        setView("summary");
-      }
-      if (data.history) {
-        setHistory(data.history as HistoryEntry[]);
+        // Restore saved summary only if it belongs to the current video
+        chrome.storage.local.get(["lastSummary", "history"], (data) => {
+          if (chrome.runtime.lastError) return;
+          if (data.lastSummary && (data.lastSummary as SummaryResult).bvid === currentVideo.bvid) {
+            setResult(data.lastSummary as SummaryResult);
+            setView("summary");
+          }
+          if (data.history) {
+            setHistory(data.history as HistoryEntry[]);
+          }
+        });
+      } else {
+        // No current video, just load history
+        chrome.storage.local.get("history", (data) => {
+          if (chrome.runtime.lastError) return;
+          if (data.history) {
+            setHistory(data.history as HistoryEntry[]);
+          }
+        });
       }
     });
 
@@ -53,6 +64,14 @@ export default function App() {
         setResult(null);
         setView("idle");
         setError("");
+      }
+      if (msg.type === "SUMMARY_READY") {
+        setResult(msg.payload as SummaryResult);
+        setView("summary");
+        // Refresh history
+        chrome.storage.local.get("history", (data) => {
+          if (data.history) setHistory(data.history as HistoryEntry[]);
+        });
       }
     };
     chrome.runtime.onMessage.addListener(listener);
@@ -103,6 +122,15 @@ export default function App() {
   }, [video]);
 
   const handleSeek = useCallback((timestamp: number) => {
+    // Try direct video access first (works in floating panel)
+    const video = document.querySelector("video");
+    if (video) {
+      video.currentTime = timestamp;
+      video.play().catch(() => {});
+      return;
+    }
+
+    // Fallback: send message to content script (works in side panel)
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {
         chrome.tabs.sendMessage(tabs[0].id, {

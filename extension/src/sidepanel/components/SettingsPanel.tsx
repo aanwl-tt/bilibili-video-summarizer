@@ -452,6 +452,56 @@ export default function SettingsPanel({ settings, onSave, showToast }: Props) {
         </div>
       )}
 
+      {/* Auto Summarize */}
+      <div style={{ marginBottom: 14 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 14px",
+            background: "var(--bg-secondary)",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>自动总结</div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+              打开视频 5 秒后自动开始总结
+            </div>
+          </div>
+          <div
+            onClick={() => setLocal({ ...local, autoSummarize: !local.autoSummarize })}
+            style={{
+              width: 44,
+              height: 24,
+              borderRadius: 12,
+              background: local.autoSummarize ? "var(--primary)" : "var(--border)",
+              cursor: "pointer",
+              position: "relative",
+              transition: "background 0.2s ease",
+              flexShrink: 0,
+              marginLeft: 12,
+            }}
+          >
+            <div
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: "50%",
+                background: "#fff",
+                position: "absolute",
+                top: 2,
+                left: local.autoSummarize ? 22 : 2,
+                transition: "left 0.2s ease",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Default Depth */}
       <div style={{ marginBottom: 14 }}>
         <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>

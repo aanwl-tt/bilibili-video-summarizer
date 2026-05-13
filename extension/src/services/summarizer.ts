@@ -8,6 +8,7 @@ export interface SummarizeInput {
   cid: number;
   title?: string;
   provider: string;
+  providerDisplayName?: string;
   model: string;
   apiKey: string;
   baseUrl?: string;
@@ -91,6 +92,8 @@ export async function summarize(input: SummarizeInput): Promise<SummaryResult> {
     tags: (parsed.tags as string[]) || [],
     source_subtitles_count: subResult.totalSegments,
     processing_time_ms: elapsedMs,
-    provider_used: input.provider,
+    provider_used: input.providerDisplayName || input.provider,
+    input_tokens: response.usage.input_tokens,
+    output_tokens: response.usage.output_tokens,
   };
 }

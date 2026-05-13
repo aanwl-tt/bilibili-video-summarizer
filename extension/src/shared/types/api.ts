@@ -22,6 +22,8 @@ export interface SummaryResult {
   source_subtitles_count: number;
   processing_time_ms: number;
   provider_used: string;
+  input_tokens?: number;
+  output_tokens?: number;
 }
 
 export interface SummarizeRequest {
