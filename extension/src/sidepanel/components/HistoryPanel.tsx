@@ -108,7 +108,7 @@ export default function HistoryPanel({ history, onBack, onDelete, showToast }: P
           >
             &#8592; 返回
           </button>
-          <h3 style={{ fontSize: 14, fontWeight: 600 }}>历史记录 ({history.length})</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 600 }}>历史记录 ({history.length}/500)</h3>
         </div>
         <button
           onClick={() => {

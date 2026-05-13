@@ -186,7 +186,7 @@ async function handleSummarize(
     };
     const existingHistoryData = await chrome.storage.local.get("history");
     const existingHistory: HistoryEntry[] = existingHistoryData.history || [];
-    const newHistory = [entry, ...existingHistory].slice(0, 100);
+    const newHistory = [entry, ...existingHistory].slice(0, 500);
     await chrome.storage.local.set({ lastSummary: data, history: newHistory });
 
     try { sendResponse({ data }); } catch {}
@@ -260,7 +260,7 @@ async function triggerAutoSummarize(video: VideoMetadata) {
       };
       const newHistoryData = await chrome.storage.local.get("history");
       const newHistory: HistoryEntry[] = newHistoryData.history || [];
-      const updatedHistory = [entry, ...newHistory].slice(0, 100);
+      const updatedHistory = [entry, ...newHistory].slice(0, 500);
       await chrome.storage.local.set({ lastSummary: data, history: updatedHistory });
 
       // Notify UI
