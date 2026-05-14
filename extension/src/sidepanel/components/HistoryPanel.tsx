@@ -81,7 +81,20 @@ export default function HistoryPanel({ history, onBack, onDelete, showToast }: P
           >
             &#8592; 返回
           </button>
-          <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
+          <a
+            href={`https://www.bilibili.com/video/${viewing.bvid}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: 13,
+              color: "var(--primary)",
+              textDecoration: "none",
+            }}
+            title="在 Bilibili 打开"
+          >
+            &#128279; 打开视频
+          </a>
+          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
             {new Date(viewing.timestamp).toLocaleString("zh-CN")}
           </span>
         </div>
@@ -252,11 +265,25 @@ export default function HistoryPanel({ history, onBack, onDelete, showToast }: P
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   whiteSpace: "nowrap",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
                 }}>
-                  {entry.title}
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{entry.title}</span>
+                  <a
+                    href={`https://www.bilibili.com/video/${entry.bvid}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ color: "var(--primary)", fontSize: 12, flexShrink: 0, textDecoration: "none" }}
+                    title="在 Bilibili 打开"
+                  >
+                    &#128279;
+                  </a>
                 </p>
                 <p style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
                   {entry.author && `${entry.author} · `}
+                  {entry.page > 1 && `P${entry.page} · `}
                   {new Date(entry.timestamp).toLocaleString("zh-CN")}
                 </p>
               </div>

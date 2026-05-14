@@ -43,7 +43,10 @@ function checkActiveTab() {
 
 chrome.tabs.onActivated.addListener(checkActiveTab);
 chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
-  if (changeInfo.url || changeInfo.status === "complete") {
+  // Only trigger on full page load, not SPA URL changes.
+  // SPA navigation fires changeInfo.url before content script updates,
+  // causing checkActiveTab() to use stale metadata and race with init().
+  if (changeInfo.status === "complete") {
     checkActiveTab();
   }
 });
@@ -81,7 +84,7 @@ chrome.runtime.onMessage.addListener(
         break;
 
       case "SUMMARIZE":
-        handleSummarize(msg as { type: "SUMMARIZE"; bvid: string; cid: number }, sendResponse);
+        handleSummarize(msg as { type: "SUMMARIZE"; bvid: string; cid: number; page?: number; force?: boolean }, sendResponse);
         return true; // Keep channel open for async
 
       case "GET_SETTINGS":
@@ -128,18 +131,21 @@ async function handleValidateProvider(
 }
 
 async function handleSummarize(
-  msg: { type: "SUMMARIZE"; bvid: string; cid: number; title?: string },
+  msg: { type: "SUMMARIZE"; bvid: string; cid: number; page?: number; title?: string; force?: boolean },
   sendResponse: (r: unknown) => void
 ) {
+  const page = msg.page || 1;
   try {
-    // Check cache first
-    const historyData = await chrome.storage.local.get("history");
-    const history: HistoryEntry[] = historyData.history || [];
-    const cached = history.find((h) => h.bvid === msg.bvid);
-    if (cached) {
-      await chrome.storage.local.set({ lastSummary: cached.result });
-      sendResponse({ data: cached.result });
-      return;
+    // Check cache first (skip if force=true)
+    if (!msg.force) {
+      const historyData = await chrome.storage.local.get("history");
+      const history: HistoryEntry[] = historyData.history || [];
+      const cached = history.find((h) => h.bvid === msg.bvid && (h.page || 1) === page);
+      if (cached) {
+        await chrome.storage.local.set({ lastSummary: cached.result });
+        sendResponse({ data: cached.result });
+        return;
+      }
     }
 
     const result = await chrome.storage.local.get("settings");
@@ -166,6 +172,7 @@ async function handleSummarize(
     const data = await summarize({
       bvid: msg.bvid,
       cid: msg.cid,
+      page,
       title: msg.title,
       provider: settings.activeProvider,
       providerDisplayName,
@@ -180,6 +187,7 @@ async function handleSummarize(
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       timestamp: Date.now(),
       bvid: msg.bvid,
+      page,
       title: msg.title || "",
       author: "",
       result: data,
@@ -218,7 +226,7 @@ async function triggerAutoSummarize(video: VideoMetadata) {
     // Check cache
     const historyData = await chrome.storage.local.get("history");
     const history: HistoryEntry[] = historyData.history || [];
-    const cached = history.find((h) => h.bvid === video.bvid);
+    const cached = history.find((h) => h.bvid === video.bvid && (h.page || 1) === (video.page || 1));
     if (cached) {
       await chrome.storage.local.set({ lastSummary: cached.result });
       return;
@@ -240,6 +248,7 @@ async function triggerAutoSummarize(video: VideoMetadata) {
       const data = await summarize({
         bvid: video.bvid,
         cid: video.cid,
+        page: video.page,
         title: video.title,
         provider: settings.activeProvider,
         providerDisplayName,
@@ -254,6 +263,7 @@ async function triggerAutoSummarize(video: VideoMetadata) {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         timestamp: Date.now(),
         bvid: video.bvid,
+        page: video.page || 1,
         title: video.title || "",
         author: "",
         result: data,

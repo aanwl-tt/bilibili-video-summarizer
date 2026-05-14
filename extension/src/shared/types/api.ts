@@ -80,6 +80,7 @@ export interface HistoryEntry {
   id: string;
   timestamp: number;
   bvid: string;
+  page: number;
   title: string;
   author: string;
   result: SummaryResult;

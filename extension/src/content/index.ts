@@ -4,10 +4,19 @@ console.log("[Bilibili Summarizer] Content script loaded");
 
 let currentMeta: VideoMetadata | null = null;
 
-// Fallback: extract BVID from URL if __INITIAL_STATE__ is not available
-function getBvidFromUrl(): string | null {
+// Retry control
+const RETRY_MAX = 5;
+const RETRY_DELAY = 2000;
+let initDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let initPromise: Promise<void> | null = null;
+
+// Fallback: extract BVID and page from URL if __INITIAL_STATE__ is not available
+function getBvidFromUrl(): { bvid: string; page: number } | null {
   const m = location.pathname.match(/\/video\/(BV\w+)/);
-  return m ? m[1] : null;
+  if (!m) return null;
+  const params = new URLSearchParams(location.search);
+  const page = parseInt(params.get("p") || "1", 10);
+  return { bvid: m[1], page };
 }
 
 function getInitialState(): Record<string, unknown> | null {
@@ -42,7 +51,7 @@ function getInitialState(): Record<string, unknown> | null {
   return null;
 }
 
-function extractVideoMetadata(state: Record<string, unknown>): VideoMetadata | null {
+function extractVideoMetadata(state: Record<string, unknown>, page: number): VideoMetadata | null {
   // Bilibili stores video data under different keys depending on version
   const vd = (state.videoData as Record<string, unknown> | undefined) ||
     (state.videoInfo as Record<string, unknown> | undefined) ||
@@ -56,6 +65,7 @@ function extractVideoMetadata(state: Record<string, unknown>): VideoMetadata | n
   return {
     bvid,
     cid,
+    page,
     aid: (vd.aid as number) || 0,
     title: (vd.title as string) || document.title.replace("_哔哩哔哩_bilibili", "").trim(),
     author: (vd.owner as Record<string, string>)?.name || (vd.author as string) || "",
@@ -151,43 +161,82 @@ function injectSummarizeButton() {
   console.log("[Bilibili Summarizer] Button injected as floating button");
 }
 
-async function init() {
+function emitVideoDetected(meta: VideoMetadata) {
+  currentMeta = meta;
+  console.log("[Bilibili Summarizer] Video detected:", meta.bvid, "title:", meta.title);
+  chrome.runtime.sendMessage({ type: "VIDEO_DETECTED", payload: meta }).catch(() => {});
+  chrome.storage.local.set({ currentVideo: meta }).catch(() => {});
+  window.dispatchEvent(new CustomEvent("bili-summarizer-video-changed", { detail: meta }));
+  setTimeout(injectSummarizeButton, 1000);
+}
+
+async function initWithRetry(retryCount = 0): Promise<void> {
+  const urlInfo = getBvidFromUrl();
+  const urlBvid = urlInfo?.bvid || null;
+  const page = urlInfo?.page || 1;
+
   // Try to get metadata from __INITIAL_STATE__
   const state = getInitialState();
   if (state) {
-    currentMeta = extractVideoMetadata(state);
-    if (currentMeta) {
-      console.log("[Bilibili Summarizer] Video detected:", currentMeta.bvid);
-      chrome.runtime.sendMessage({ type: "VIDEO_DETECTED", payload: currentMeta }).catch(() => {});
-      chrome.storage.local.set({ currentVideo: currentMeta }).catch(() => {});
-      window.dispatchEvent(new CustomEvent("bili-summarizer-video-changed", { detail: currentMeta }));
-      setTimeout(injectSummarizeButton, 1000);
-      return;
+    const meta = extractVideoMetadata(state, page);
+    if (meta) {
+      if (urlBvid && meta.bvid !== urlBvid) {
+        // __INITIAL_STATE__ has stale data from previous video
+        console.log("[Bilibili Summarizer] Stale state:", meta.bvid, "!== URL:", urlBvid,
+          retryCount < RETRY_MAX ? `retry ${retryCount + 1}/${RETRY_MAX}` : "max retries, using URL");
+        if (retryCount < RETRY_MAX) {
+          await new Promise((r) => setTimeout(r, RETRY_DELAY));
+          return initWithRetry(retryCount + 1);
+        }
+        // Max retries: fall through to URL fallback
+      } else {
+        // Happy path: bvid matches URL or no URL to compare
+        emitVideoDetected(meta);
+        return;
+      }
     }
   }
 
-  // Fallback: extract bvid from URL
-  const bvid = getBvidFromUrl();
-  if (bvid) {
-    console.log("[Bilibili Summarizer] Video detected from URL:", bvid);
-    currentMeta = {
-      bvid,
+  // Fallback: extract bvid from URL (always correct)
+  if (urlBvid) {
+    console.log("[Bilibili Summarizer] Using URL bvid:", urlBvid, "page:", page);
+    emitVideoDetected({
+      bvid: urlBvid,
       cid: 0,
+      page,
       aid: 0,
       title: document.title.replace("_哔哩哔哩_bilibili", "").trim(),
       author: "",
       duration: 0,
       coverUrl: "",
       hasSubtitles: false,
-    };
-    chrome.runtime.sendMessage({ type: "VIDEO_DETECTED", payload: currentMeta }).catch(() => {});
-    window.dispatchEvent(new CustomEvent("bili-summarizer-video-changed", { detail: currentMeta }));
-    setTimeout(injectSummarizeButton, 1000);
+    });
     return;
   }
 
-  // Retry for async-loaded pages
-  setTimeout(init, 2000);
+  // No video detected, retry if under limit
+  if (retryCount < RETRY_MAX) {
+    console.log("[Bilibili Summarizer] No video found, retry", retryCount + 1, "/", RETRY_MAX);
+    await new Promise((r) => setTimeout(r, RETRY_DELAY));
+    return initWithRetry(retryCount + 1);
+  }
+  console.log("[Bilibili Summarizer] No video detected after max retries");
+}
+
+async function init(): Promise<void> {
+  // Cancel any pending debounce
+  if (initDebounceTimer) {
+    clearTimeout(initDebounceTimer);
+    initDebounceTimer = null;
+  }
+
+  // Deduplicate: if already running, wait for existing promise
+  if (initPromise) return initPromise;
+
+  initPromise = initWithRetry().finally(() => {
+    initPromise = null;
+  });
+  return initPromise;
 }
 
 // Listen for messages from side panel and background
@@ -224,7 +273,10 @@ let lastUrl = location.href;
 function checkUrlChange() {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
-    setTimeout(init, 1000);
+    console.log("[Bilibili Summarizer] URL changed:", location.href);
+    // Debounce init to avoid multiple triggers firing at once
+    if (initDebounceTimer) clearTimeout(initDebounceTimer);
+    initDebounceTimer = setTimeout(init, 1000);
   }
 }
 

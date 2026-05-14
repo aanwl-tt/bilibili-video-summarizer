@@ -38,7 +38,7 @@ function selectSubtitle(
   return subtitles[0];
 }
 
-export async function getCid(bvid: string): Promise<number | null> {
+export async function getCid(bvid: string, page?: number): Promise<number | null> {
   try {
     const resp = await fetch(
       `${API_ENDPOINTS.PAGELIST}?bvid=${encodeURIComponent(bvid)}`,
@@ -47,7 +47,8 @@ export async function getCid(bvid: string): Promise<number | null> {
     if (!resp.ok) return null;
     const data = await resp.json();
     if (data?.code === 0 && data?.data?.length > 0) {
-      return data.data[0].cid;
+      const idx = (page && page > 0) ? page - 1 : 0;
+      return data.data[Math.min(idx, data.data.length - 1)].cid;
     }
     return null;
   } catch {
@@ -57,10 +58,11 @@ export async function getCid(bvid: string): Promise<number | null> {
 
 export async function fetchSubtitles(
   bvid: string,
-  cid?: number
+  cid?: number,
+  page?: number
 ): Promise<SubtitleResult | null> {
   if (!cid) {
-    cid = (await getCid(bvid)) || undefined;
+    cid = (await getCid(bvid, page)) || undefined;
     if (!cid) return null;
   }
 

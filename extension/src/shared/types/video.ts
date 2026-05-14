@@ -7,6 +7,7 @@ export interface SubtitleSegment {
 export interface VideoMetadata {
   bvid: string;
   cid: number;
+  page: number;
   aid: number;
   title: string;
   author: string;

@@ -32,7 +32,9 @@ export default function App() {
         // Restore saved summary only if it belongs to the current video
         chrome.storage.local.get(["lastSummary", "history"], (data) => {
           if (chrome.runtime.lastError) return;
-          if (data.lastSummary && (data.lastSummary as SummaryResult).bvid === currentVideo.bvid) {
+          if (data.lastSummary
+              && (data.lastSummary as SummaryResult).bvid === currentVideo.bvid
+              && (data.lastSummary as SummaryResult).title === currentVideo.title) {
             setResult(data.lastSummary as SummaryResult);
             setView("summary");
           }
@@ -83,7 +85,7 @@ export default function App() {
     setTimeout(() => setToast(""), 2000);
   }, []);
 
-  const handleSummarize = useCallback(async () => {
+  const handleSummarize = useCallback(async (force?: boolean) => {
     if (!video) {
       setError("请先打开一个 Bilibili 视频页面");
       setView("error");
@@ -94,7 +96,7 @@ export default function App() {
     setError("");
 
     chrome.runtime.sendMessage(
-      { type: "SUMMARIZE", bvid: video.bvid, cid: video.cid, title: video.title },
+      { type: "SUMMARIZE", bvid: video.bvid, cid: video.cid, page: video.page || 1, title: video.title, force: !!force },
       (response: { data?: SummaryResult; error?: string } | undefined) => {
         if (chrome.runtime.lastError) {
           setError(chrome.runtime.lastError.message || "消息通道错误");
@@ -203,7 +205,7 @@ export default function App() {
           </button>
           {view === "summary" && (
             <button
-              onClick={handleSummarize}
+              onClick={() => handleSummarize(true)}
               style={{
                 background: "var(--primary)",
                 border: "none",
@@ -296,7 +298,7 @@ export default function App() {
       {view === "idle" && video && (
         <div style={{ textAlign: "center", padding: "24px 0" }} className="animate-slide-up">
           <button
-            onClick={handleSummarize}
+            onClick={() => handleSummarize()}
             style={{
               padding: "12px 36px",
               background: "linear-gradient(135deg, var(--primary), #fc8b9f)",
@@ -334,7 +336,7 @@ export default function App() {
           <div style={{ fontSize: 36, marginBottom: 12 }}>&#10060;</div>
           <p style={{ color: "var(--error)", marginBottom: 16, fontSize: 13 }}>{error}</p>
           <button
-            onClick={handleSummarize}
+            onClick={() => handleSummarize()}
             style={{
               padding: "8px 24px",
               background: "var(--primary)",

@@ -6,6 +6,7 @@ import { SYSTEM_PROMPT_ZH, buildUserPrompt, parseJsonResponse } from "./prompt";
 export interface SummarizeInput {
   bvid: string;
   cid: number;
+  page?: number;
   title?: string;
   provider: string;
   providerDisplayName?: string;
@@ -25,7 +26,7 @@ export async function summarize(input: SummarizeInput): Promise<SummaryResult> {
   const temperature = input.options?.temperature ?? 0.3;
 
   // 1. Fetch subtitles
-  const subResult = await fetchSubtitles(input.bvid, input.cid);
+  const subResult = await fetchSubtitles(input.bvid, input.cid, input.page);
   if (!subResult || !subResult.textContent) {
     throw new Error("未找到字幕。该视频可能没有 CC 字幕或 AI 字幕。");
   }
