@@ -38,6 +38,9 @@ export default function FloatingPanel({ children, onMinimize, onClose, isDark, o
   const dragRef = useRef<{ startX: number; startY: number; startState: PanelState } | null>(null);
   const resizeRef = useRef<{ dir: string; startX: number; startY: number; startState: PanelState } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const stateRef = useRef(state);
+  // Keep stateRef in sync with state
+  stateRef.current = state;
 
   // Load saved position/size
   useEffect(() => {
@@ -63,21 +66,18 @@ export default function FloatingPanel({ children, onMinimize, onClose, isDark, o
   // --- Drag ---
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    dragRef.current = { startX: e.clientX, startY: e.clientY, startState: { ...state } };
+    dragRef.current = { startX: e.clientX, startY: e.clientY, startState: { ...stateRef.current } };
     const handleMove = (ev: MouseEvent) => {
       if (!dragRef.current) return;
       const dx = ev.clientX - dragRef.current.startX;
       const dy = ev.clientY - dragRef.current.startY;
-      const newState = {
-        ...dragRef.current.startState,
-        x: dragRef.current.startState.x + dx,
-        y: Math.max(0, dragRef.current.startState.y + dy),
-      };
-      setState(newState);
+      const newX = Math.max(-stateRef.current.width + 40, Math.min(window.innerWidth - 40, dragRef.current.startState.x + dx));
+      const newY = Math.max(0, dragRef.current.startState.y + dy);
+      setState((prev) => ({ ...prev, x: newX, y: newY }));
     };
     const handleUp = () => {
       if (dragRef.current) {
-        saveState({ ...dragRef.current.startState, x: state.x, y: state.y });
+        saveState(stateRef.current);
       }
       dragRef.current = null;
       document.removeEventListener("mousemove", handleMove);
@@ -85,13 +85,13 @@ export default function FloatingPanel({ children, onMinimize, onClose, isDark, o
     };
     document.addEventListener("mousemove", handleMove);
     document.addEventListener("mouseup", handleUp);
-  }, [state, saveState]);
+  }, [saveState]);
 
   // --- Resize ---
   const handleResizeStart = useCallback((e: React.MouseEvent, dir: string) => {
     e.preventDefault();
     e.stopPropagation();
-    resizeRef.current = { dir, startX: e.clientX, startY: e.clientY, startState: { ...state } };
+    resizeRef.current = { dir, startX: e.clientX, startY: e.clientY, startState: { ...stateRef.current } };
     const handleMove = (ev: MouseEvent) => {
       if (!resizeRef.current) return;
       const dx = ev.clientX - resizeRef.current.startX;
@@ -114,7 +114,7 @@ export default function FloatingPanel({ children, onMinimize, onClose, isDark, o
     };
     const handleUp = () => {
       if (resizeRef.current) {
-        saveState(state);
+        saveState(stateRef.current);
       }
       resizeRef.current = null;
       document.removeEventListener("mousemove", handleMove);
@@ -122,7 +122,7 @@ export default function FloatingPanel({ children, onMinimize, onClose, isDark, o
     };
     document.addEventListener("mousemove", handleMove);
     document.addEventListener("mouseup", handleUp);
-  }, [state, saveState]);
+  }, [saveState]);
 
   if (!loaded) return null;
 
@@ -154,7 +154,7 @@ export default function FloatingPanel({ children, onMinimize, onClose, isDark, o
         overflow: "hidden",
         zIndex: 2147483646,
         border: "1px solid var(--border)",
-        animation: "fadeIn 0.25s ease",
+        animation: "bs-fadeIn 0.25s ease",
       }}
     >
       {/* Header */}

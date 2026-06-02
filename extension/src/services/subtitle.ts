@@ -42,7 +42,7 @@ export async function getCid(bvid: string, page?: number): Promise<number | null
   try {
     const resp = await fetch(
       `${API_ENDPOINTS.PAGELIST}?bvid=${encodeURIComponent(bvid)}`,
-      { headers: BROWSER_HEADERS, credentials: "include" }
+      { headers: BROWSER_HEADERS, credentials: "include", signal: AbortSignal.timeout(15_000) }
     );
     if (!resp.ok) return null;
     const data = await resp.json();
@@ -77,7 +77,7 @@ export async function fetchSubtitles(
     }
     const resp = await fetch(
       `${API_ENDPOINTS.PLAYER_WBI_V2}?${params.toString()}`,
-      { headers: BROWSER_HEADERS, credentials: "include" }
+      { headers: BROWSER_HEADERS, credentials: "include", signal: AbortSignal.timeout(15_000) }
     );
     if (resp.ok) {
       const data = await resp.json();
@@ -85,20 +85,24 @@ export async function fetchSubtitles(
         subtitles = data?.data?.subtitle?.subtitles || [];
       }
     }
-  } catch {}
+  } catch (e) {
+    console.debug("[Bilibili Summarizer] WBI subtitle fetch failed, falling back:", e);
+  }
 
   // Fallback to unsigned endpoint
   if (subtitles.length === 0) {
     try {
       const resp = await fetch(
         `${API_ENDPOINTS.SUBTITLE_GET}?bvid=${encodeURIComponent(bvid)}&cid=${cid}`,
-        { headers: BROWSER_HEADERS, credentials: "include" }
+        { headers: BROWSER_HEADERS, credentials: "include", signal: AbortSignal.timeout(15_000) }
       );
       if (resp.ok) {
         const data = await resp.json();
         subtitles = data?.data?.subtitle?.subtitles || [];
       }
-    } catch {}
+    } catch (e) {
+      console.debug("[Bilibili Summarizer] Unsigned subtitle fetch failed:", e);
+    }
   }
 
   if (subtitles.length === 0) return null;
@@ -110,7 +114,7 @@ export async function fetchSubtitles(
   let url = selected.subtitle_url;
   if (url.startsWith("//")) url = "https:" + url;
 
-  const subResp = await fetch(url);
+  const subResp = await fetch(url, { signal: AbortSignal.timeout(15_000) });
   if (!subResp.ok) return null;
   const subData = await subResp.json();
 

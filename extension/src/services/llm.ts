@@ -42,6 +42,7 @@ async function callClaude(messages: LLMMessage[], config: LLMConfig): Promise<LL
       "content-type": "application/json",
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(300_000),
   });
 
   if (!resp.ok) {
@@ -82,6 +83,7 @@ async function callOpenAI(messages: LLMMessage[], config: LLMConfig): Promise<LL
       max_tokens: config.maxTokens,
       temperature: config.temperature,
     }),
+    signal: AbortSignal.timeout(300_000),
   });
 
   if (!resp.ok) {
@@ -91,9 +93,12 @@ async function callOpenAI(messages: LLMMessage[], config: LLMConfig): Promise<LL
 
   const data = await resp.json();
   const choice = data.choices?.[0];
+  if (!choice) {
+    throw new Error("OpenAI API 返回了空的 choices");
+  }
 
   return {
-    content: choice?.message?.content || "",
+    content: choice.message?.content || "",
     model: data.model || config.model,
     usage: {
       input_tokens: data.usage?.prompt_tokens || 0,

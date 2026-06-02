@@ -41,6 +41,22 @@ export default function App() {
           if (data.history) {
             setHistory(data.history as HistoryEntry[]);
           }
+
+          // Check for pending result from a background summarization
+          chrome.runtime.sendMessage(
+            { type: "GET_PENDING_RESULT", bvid: currentVideo.bvid, page: currentVideo.page || 1 },
+            (pending: { data?: SummaryResult } | null | undefined) => {
+              if (chrome.runtime.lastError || !pending?.data) return;
+              const d = pending.data;
+              if ((d as unknown as Record<string, unknown>)._error) return; // skip error results
+              setResult(d);
+              setView("summary");
+              // Refresh history
+              chrome.storage.local.get("history", (hd) => {
+                if (hd.history) setHistory(hd.history as HistoryEntry[]);
+              });
+            }
+          );
         });
       } else {
         // No current video, just load history
@@ -99,13 +115,13 @@ export default function App() {
       { type: "SUMMARIZE", bvid: video.bvid, cid: video.cid, page: video.page || 1, title: video.title, force: !!force },
       (response: { data?: SummaryResult; error?: string } | undefined) => {
         if (chrome.runtime.lastError) {
-          setError(chrome.runtime.lastError.message || "消息通道错误");
-          setView("error");
+          // Channel closed (user navigated away) — result will arrive via SUMMARY_READY / pendingResult
+          console.log("[Bilibili Summarizer] sendResponse failed, waiting for background result");
           return;
         }
         if (!response) {
-          setError("未收到服务器响应");
-          setView("error");
+          // Same: channel closed before response
+          console.log("[Bilibili Summarizer] No response, waiting for background result");
           return;
         }
         if (response.error) {
@@ -122,6 +138,51 @@ export default function App() {
       }
     );
   }, [video]);
+
+  // Safety net: when in loading state, listen for SUMMARY_READY and poll for pending results
+  useEffect(() => {
+    if (view !== "loading" || !video) return;
+
+    // Listen for background SUMMARY_READY message
+    const listener = (message: unknown) => {
+      const msg = message as Record<string, unknown>;
+      if (msg.type === "SUMMARY_READY" && msg.payload) {
+        setResult(msg.payload as SummaryResult);
+        setView("summary");
+        chrome.storage.local.get("history", (data) => {
+          if (data.history) setHistory(data.history as HistoryEntry[]);
+        });
+      }
+    };
+    chrome.runtime.onMessage.addListener(listener);
+
+    // Poll for pendingResult fallback (in case SUMMARY_READY also fails)
+    const timer = setInterval(() => {
+      chrome.runtime.sendMessage(
+        { type: "GET_PENDING_RESULT", bvid: video.bvid, page: video.page || 1 },
+        (response: { data?: SummaryResult } | null | undefined) => {
+          if (chrome.runtime.lastError || !response?.data) return;
+          const data = response.data;
+          // Check if it's an error result
+          if ((data as unknown as Record<string, unknown>)._error) {
+            setError((data as unknown as Record<string, unknown>)._error as string);
+            setView("error");
+          } else {
+            setResult(data);
+            setView("summary");
+            chrome.storage.local.get("history", (d) => {
+              if (d.history) setHistory(d.history as HistoryEntry[]);
+            });
+          }
+        }
+      );
+    }, 2000);
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(listener);
+      clearInterval(timer);
+    };
+  }, [view, video]);
 
   const handleSeek = useCallback((timestamp: number) => {
     // Try direct video access first (works in floating panel)

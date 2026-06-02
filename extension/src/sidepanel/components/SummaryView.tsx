@@ -8,8 +8,9 @@ interface Props {
   showToast: (msg: string) => void;
 }
 
-function ChapterCard({ chapter, onSeek }: { chapter: Chapter; onSeek: (t: number) => void }) {
+function ChapterCard({ chapter, onSeek, depth = 0 }: { chapter: Chapter; onSeek: (t: number) => void; depth?: number }) {
   const [expanded, setExpanded] = React.useState(true);
+  const MAX_DEPTH = 3;
 
   return (
     <div
@@ -96,8 +97,8 @@ function ChapterCard({ chapter, onSeek }: { chapter: Chapter; onSeek: (t: number
           </ul>
 
           {/* Sub-chapters */}
-          {chapter.sub_chapters?.map((sc, i) => (
-            <ChapterCard key={i} chapter={sc} onSeek={onSeek} />
+          {depth < MAX_DEPTH && chapter.sub_chapters?.map((sc, i) => (
+            <ChapterCard key={`${sc.title}-${sc.start_time}-${i}`} chapter={sc} onSeek={onSeek} depth={depth + 1} />
           ))}
         </div>
       )}
@@ -110,6 +111,8 @@ export default function SummaryView({ result, onSeek, showToast }: Props) {
     const text = generateMarkdown(result);
     navigator.clipboard.writeText(text).then(() => {
       showToast("已复制到剪贴板");
+    }).catch(() => {
+      showToast("复制失败");
     });
   };
 

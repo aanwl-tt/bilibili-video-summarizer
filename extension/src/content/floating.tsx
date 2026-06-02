@@ -4,6 +4,34 @@ import FloatingPanel from "./components/FloatingPanel";
 import MinimizedButton from "./components/MinimizedButton";
 import App from "../sidepanel/App";
 
+// Error boundary to prevent the floating panel from white-screening
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: string }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: "" };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error: error.message };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 20, textAlign: "center", color: "var(--error)" }}>
+          <p style={{ marginBottom: 8 }}>面板加载出错</p>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>{this.state.error}</p>
+          <button
+            onClick={() => this.setState({ hasError: false, error: "" })}
+            style={{ padding: "6px 20px", background: "var(--primary)", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer" }}
+          >
+            重试
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const HOST_ID = "bili-summarizer-floating";
 const STYLE_ID = "bili-summarizer-styles";
 const THEME_KEY = "floatingTheme";
@@ -61,6 +89,12 @@ function FloatingApp() {
   const [hasResult, setHasResult] = useState(false);
   const [isDark, setIsDark] = useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
   const [videoKey, setVideoKey] = useState(0);
+
+  // Apply default theme immediately (in case storage callback is delayed)
+  useEffect(() => {
+    const host = document.getElementById(HOST_ID);
+    if (host) applyVars(host, CSS_VARS_LIGHT, false);
+  }, []);
 
   // Load saved theme preference + listen for messages
   useEffect(() => {
@@ -143,7 +177,9 @@ function FloatingApp() {
       onToggleTheme={handleToggleTheme}
       onRefresh={handleRefresh}
     >
-      <App key={videoKey} />
+      <ErrorBoundary>
+        <App key={videoKey} />
+      </ErrorBoundary>
     </FloatingPanel>
   );
 }

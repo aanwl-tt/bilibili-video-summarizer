@@ -101,6 +101,12 @@ chrome.runtime.onMessage.addListener(
           sendResponse
         );
         return true;
+
+      case "GET_PENDING_RESULT":
+        consumePendingResult(msg.bvid as string, (msg.page as number) || 1).then((result) => {
+          sendResponse(result ? { data: result } : null);
+        });
+        return true;
     }
   }
 );
@@ -128,6 +134,29 @@ async function handleValidateProvider(
     temperature: 0,
   });
   sendResponse(result);
+}
+
+// ---- Pending result fallback ----
+// When sendResponse fails (panel closed, component unmounted), store result in storage.
+// UI reads this on mount / video change as a safety net.
+function pendingResultKey(bvid: string, page: number) {
+  return `pendingResult:${bvid}:${page}`;
+}
+
+async function savePendingResult(bvid: string, page: number, result: SummaryResult) {
+  try {
+    await chrome.storage.local.set({ [pendingResultKey(bvid, page)]: result });
+  } catch {}
+}
+
+async function consumePendingResult(bvid: string, page: number): Promise<SummaryResult | null> {
+  const key = pendingResultKey(bvid, page);
+  const data = await chrome.storage.local.get(key);
+  if (data[key]) {
+    await chrome.storage.local.remove(key);
+    return data[key] as SummaryResult;
+  }
+  return null;
 }
 
 async function handleSummarize(
@@ -197,9 +226,17 @@ async function handleSummarize(
     const newHistory = [entry, ...existingHistory].slice(0, 500);
     await chrome.storage.local.set({ lastSummary: data, history: newHistory });
 
+    // Fallback: save to pendingResult in case sendResponse fails
+    await savePendingResult(msg.bvid, page, data);
+
     try { sendResponse({ data }); } catch {}
+    // Notify all panels
+    chrome.runtime.sendMessage({ type: "SUMMARY_READY", payload: data }).catch(() => {});
   } catch (e) {
-    try { sendResponse({ error: `Failed to summarize: ${e instanceof Error ? e.message : String(e)}` }); } catch {}
+    // Fallback: save error to pendingResult so UI can pick it up
+    const errorMsg = `Failed to summarize: ${e instanceof Error ? e.message : String(e)}`;
+    await savePendingResult(msg.bvid, page, { _error: errorMsg } as unknown as SummaryResult);
+    try { sendResponse({ error: errorMsg }); } catch {}
   }
 }
 

@@ -11,6 +11,8 @@ export default function MinimizedButton({ onRestore, hasResult }: Props) {
   const [pos, setPos] = useState({ x: window.innerWidth - 70, y: window.innerHeight - 70 });
   const [loaded, setLoaded] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; startPos: { x: number; y: number }; moved: boolean } | null>(null);
+  const posRef = useRef(pos);
+  posRef.current = pos;
 
   useEffect(() => {
     chrome.storage.local.get(POS_KEY, (data) => {
@@ -31,7 +33,7 @@ export default function MinimizedButton({ onRestore, hasResult }: Props) {
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    dragRef.current = { startX: e.clientX, startY: e.clientY, startPos: { ...pos }, moved: false };
+    dragRef.current = { startX: e.clientX, startY: e.clientY, startPos: { ...posRef.current }, moved: false };
     const handleMove = (ev: MouseEvent) => {
       if (!dragRef.current) return;
       const dx = ev.clientX - dragRef.current.startX;
@@ -44,7 +46,7 @@ export default function MinimizedButton({ onRestore, hasResult }: Props) {
     };
     const handleUp = () => {
       if (dragRef.current) {
-        savePos(pos);
+        savePos(posRef.current);
         if (!dragRef.current.moved) {
           onRestore();
         }
@@ -55,7 +57,7 @@ export default function MinimizedButton({ onRestore, hasResult }: Props) {
     };
     document.addEventListener("mousemove", handleMove);
     document.addEventListener("mouseup", handleUp);
-  }, [pos, savePos, onRestore]);
+  }, [savePos, onRestore]);
 
   if (!loaded) return null;
 

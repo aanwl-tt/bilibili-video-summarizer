@@ -416,7 +416,7 @@ export default function SettingsPanel({ settings, onSave, showToast }: Props) {
           <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={handleAddProvider}
-              disabled={!newProvider.name || !newProvider.baseUrl || !newProvider.model}
+              disabled={!newProvider.name || !newProvider.baseUrl || !newProvider.model || !newProvider.apiKey}
               style={{
                 flex: 1,
                 padding: "7px 0",
@@ -433,6 +433,7 @@ export default function SettingsPanel({ settings, onSave, showToast }: Props) {
             <button
               onClick={() => {
                 setShowAddForm(false);
+                setNewProvider({ name: "", apiFormat: "openai", baseUrl: "", apiKey: "", model: "" });
                 setValidateStatus("idle");
                 setValidateError("");
               }}

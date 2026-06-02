@@ -45,13 +45,13 @@ export const SYSTEM_PROMPT_ZH = `你是一个专业的视频内容整理助手�
 
 const USER_PROMPT_TEMPLATE = `请为以下B站视频生成完整笔记。
 
-视频标题: {title}
-字幕总时长: {duration}秒
-字幕片段数: {segment_count}
+视频标题: <<<TITLE>>>
+字幕总时长: <<<DURATION>>>秒
+字幕片段数: <<<SEGMENT_COUNT>>>
 
 以下是带时间戳的字幕文本：
 
-{subtitle_text}
+<<<SUBTITLE_TEXT>>>
 
 请严格按照系统提示中的JSON格式返回结果。`;
 
@@ -62,10 +62,10 @@ export function buildUserPrompt(args: {
   subtitleText: string;
 }): string {
   return USER_PROMPT_TEMPLATE
-    .replace("{title}", args.title)
-    .replace("{duration}", String(args.duration))
-    .replace("{segment_count}", String(args.segmentCount))
-    .replace("{subtitle_text}", args.subtitleText);
+    .replace("<<<TITLE>>>", args.title)
+    .replace("<<<DURATION>>>", String(args.duration))
+    .replace("<<<SEGMENT_COUNT>>>", String(args.segmentCount))
+    .replace("<<<SUBTITLE_TEXT>>>", args.subtitleText);
 }
 
 export function parseJsonResponse(content: string): Record<string, unknown> {
@@ -84,12 +84,6 @@ export function parseJsonResponse(content: string): Record<string, unknown> {
     try { return JSON.parse(braceMatch[0]); } catch {}
   }
 
-  // Fallback
-  return {
-    title: "",
-    author: "",
-    overall_summary: `Failed to parse LLM response: ${content.slice(0, 500)}`,
-    chapters: [],
-    tags: [],
-  };
+  // Fallback: throw error instead of returning a fake summary
+  throw new Error(`LLM 响应解析失败: ${content.slice(0, 300)}`);
 }

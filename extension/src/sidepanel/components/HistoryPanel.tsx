@@ -46,6 +46,7 @@ export default function HistoryPanel({ history, onBack, onDelete, showToast }: P
 
   const handleDeleteSelected = () => {
     if (selected.size === 0) return;
+    if (!window.confirm(`确定要删除选中的 ${selected.size} 条记录吗？此操作不可撤销。`)) return;
     onDelete(Array.from(selected));
     setSelected(new Set());
     setShowCheckboxes(false);

@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsXMZswWWus0ugcpcExmOUeIBk2bIkcuW8MGzjElTKLoqsyNjt4igeayV+1S1jic2erZ+vtzHM0xVn60UeX1eFxxnc3b7V01NiXGiWo3OkWSbZUYzzXPBIngVkpJbbDAcUFHAXTk1ecFcHFknzXHJ8wiwB1ydYPQD0DJEWvaVFilmcpyYvDIsKR/WXNzQNOza+RnYzba6sz3x3uorcsQ/yG1ipXfEj2yyJANMJmkNAneFfS6yWM08AQhi7jkWbyn4EDYKyyKnZ2+na1oO2L5x0mIxx1Envo/LvJh6O0yob7Pfl4fUV40Dqe1qtm0Ele70u1veptTfaE0P5NUyPkMQfQIDAQAB",
   "name": "Bilibili Summarizer",
   "version": "0.1.0",
   "description": "AI-powered structured notes for Bilibili videos",
+  "minimum_chrome_version": "114",
   "permissions": ["storage", "sidePanel", "tabs"],
   "host_permissions": [
     "*://*.bilibili.com/*",
@@ -11,6 +13,9 @@
     "https://api.deepseek.com/*",
     "http://localhost:11434/*"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' 'unsafe-inline'"
+  },
   "background": {
     "service_worker": "background.js",
     "type": "module"

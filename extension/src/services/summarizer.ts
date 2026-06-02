@@ -33,11 +33,11 @@ export async function summarize(input: SummarizeInput): Promise<SummaryResult> {
 
   let text = subResult.textContent;
 
-  // 2. Truncate if too long
-  const estimatedTokens = Math.floor(text.length / 2);
-  if (estimatedTokens > maxTokens * 3) {
-    const maxChars = maxTokens * 2 * 3;
-    text = text.slice(0, maxChars) + "\n...(文本截断)";
+  // 2. Truncate if too long (cut at line boundary)
+  const MAX_INPUT_CHARS = 200000; // ~100k tokens, fits most model context windows
+  if (text.length > MAX_INPUT_CHARS) {
+    const cutIdx = text.lastIndexOf("\n", MAX_INPUT_CHARS);
+    text = (cutIdx > MAX_INPUT_CHARS / 2 ? text.slice(0, cutIdx) : text.slice(0, MAX_INPUT_CHARS)) + "\n...(文本截断)";
   }
 
   // 3. Count segments and extract duration
@@ -46,8 +46,8 @@ export async function summarize(input: SummarizeInput): Promise<SummaryResult> {
 
   let duration = 0;
   const lastLines = lines.slice(-10);
-  for (const line of lastLines) {
-    const match = line.match(/\[(\d+):(\d+)\]/);
+  for (let i = lastLines.length - 1; i >= 0; i--) {
+    const match = lastLines[i].match(/\[(\d+):(\d+)\]/);
     if (match) {
       duration = parseInt(match[1]) * 60 + parseInt(match[2]);
       break;

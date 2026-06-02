@@ -41,7 +41,7 @@ function getInitialState(): Record<string, unknown> | null {
     const scripts = document.querySelectorAll("script");
     for (const s of scripts) {
       const t = s.textContent || "";
-      const m = t.match(/window\.__INITIAL_STATE__\s*=\s*({.*?});\s*</);
+      const m = t.match(/window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*?\});\s*[<\n]/);
       if (m) return JSON.parse(m[1]);
     }
   } catch {
@@ -280,12 +280,17 @@ function checkUrlChange() {
   }
 }
 
-// Method 1: MutationObserver for DOM changes
+// Method 1: MutationObserver for DOM changes (debounced)
+let observerDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 new MutationObserver(() => {
-  if (!document.getElementById("bili-summarizer-btn") && !!getBvidFromUrl()) {
-    injectSummarizeButton();
-  }
-  checkUrlChange();
+  if (observerDebounceTimer) return;
+  observerDebounceTimer = setTimeout(() => {
+    observerDebounceTimer = null;
+    if (!document.getElementById("bili-summarizer-btn") && !!getBvidFromUrl()) {
+      injectSummarizeButton();
+    }
+    checkUrlChange();
+  }, 500);
 }).observe(document.body, { childList: true, subtree: true, attributes: false });
 
 // Method 2: popstate for back/forward navigation
